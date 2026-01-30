@@ -23,7 +23,7 @@ function App() {
             <span className="logo-sub">Photography & Events</span>
           </div>
           <div className="copyright">
-            &copy; {new Date().getFullYear()} Waas Photography & Events. All rights reserved.
+            &copy; {new Date().getFullYear()} Waas Photography & Events. All rights reserved.| Developed by BuildNex
           </div>
           <div className="social-footer">
             <a href="https://instagram.com/waas_photography_" target="_blank" rel="noreferrer">Instagram</a>

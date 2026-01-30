@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import './Contact.css';
 
+// --- Form backend: use Formspree (recommended) or Google Forms ---
+// Formspree: sign up at https://formspree.io, create a form, paste your endpoint below.
+// Submissions go to your email + Formspree dashboard (no 400 issues).
+const FORMSPREE_ENDPOINT = ''; // e.g. 'https://formspree.io/f/xxxxxxxx'
+
+const GOOGLE_FORM_POST_URL =
+    'https://docs.google.com/forms/u/0/d/e/1FAIpQLSeLpQA2_86LM2P8EtwL9zKMERnheGsly4rupsg8ZIR0b6E35A/formResponse';
+const GOOGLE_FORM_ENTRY_IDS = {
+    name: 'entry.1955117638',
+    email: 'entry.1162106594',
+    inquiryType: 'entry.1485374615',
+    message: 'entry.995335697',
+};
+
 const Contact = () => {
     const team = [
         { name: 'Anand', role: 'Sales', phone: '85082 36736' },
@@ -10,8 +24,8 @@ const Contact = () => {
         { name: 'Kumaran', role: 'Marketing', phone: '96290 06033' },
     ];
 
-    // Sales team to receive the form message (Anand & Wasim)
-    // const salesContacts = team.slice(0, 2);
+    const [success, setSuccess] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -25,9 +39,7 @@ const Contact = () => {
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-
-
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!formData.name.trim() || !formData.message.trim()) {
@@ -35,23 +47,58 @@ const Contact = () => {
             return;
         }
 
-        const emailRecipient = 'waasphotography4@gmail.com';
-        const subject = encodeURIComponent(`New Inquiry: ${formData.inquiryType} from ${formData.name}`);
-        const bodyContent =
-            `Name: ${formData.name}\n` +
-            `Email: ${formData.email}\n` +
-            `Inquiry Type: ${formData.inquiryType}\n\n` +
-            `Message:\n${formData.message}`;
+        setLoading(true);
 
-        const body = encodeURIComponent(bodyContent);
-
-        window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+        try {
+            if (FORMSPREE_ENDPOINT && FORMSPREE_ENDPOINT.includes('formspree.io')) {
+                // Formspree: reliable, submissions to email + dashboard
+                const res = await fetch(FORMSPREE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: formData.name,
+                        email: formData.email,
+                        inquiryType: formData.inquiryType,
+                        message: formData.message,
+                    }),
+                });
+                if (!res.ok) throw new Error('Submit failed');
+            } else {
+                // Google Forms (often returns 400 from external sites)
+                const fields = {
+                    [GOOGLE_FORM_ENTRY_IDS.name]: formData.name,
+                    [GOOGLE_FORM_ENTRY_IDS.email]: formData.email,
+                    [GOOGLE_FORM_ENTRY_IDS.inquiryType]: formData.inquiryType,
+                    [GOOGLE_FORM_ENTRY_IDS.message]: formData.message,
+                };
+                const encodedBody = Object.entries(fields)
+                    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+                    .join('&')
+                    .replace(/%20/g, '+');
+                await fetch(GOOGLE_FORM_POST_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: encodedBody,
+                });
+            }
+            setSuccess(true);
+            setFormData({ name: '', email: '', inquiryType: 'Wedding Photography', message: '' });
+            setTimeout(() => setSuccess(false), 4000);
+        } catch {
+            alert('Could not send. Try Formspree (see comment in Contact.jsx) or try again later.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <section id="contact" className="contact-section">
             <div className="container">
                 <h2 className="section-title">Get In Touch</h2>
+
+                
+
                 <div className="contact-grid">
                     <div className="contact-info">
                         <h3>Contact Our Team</h3>
@@ -66,7 +113,10 @@ const Contact = () => {
                                         <h4>{member.name}</h4>
                                         <span>{member.role}</span>
                                     </div>
-                                    <a href={`tel:${member.phone.replace(/\s/g, '')}`} className="phone-link">
+                                    <a
+                                        href={`tel:${member.phone.replace(/\s/g, '')}`}
+                                        className="phone-link"
+                                    >
                                         {member.phone}
                                     </a>
                                 </div>
@@ -74,11 +124,23 @@ const Contact = () => {
                         </div>
 
                         <div className="quick-links">
-                            <a href="https://wa.me/918508236736" className="whatsapp-cta" target="_blank" rel="noreferrer">
+                            <a
+                                href="https://wa.me/918508236736"
+                                className="whatsapp-cta"
+                                target="_blank"
+                                rel="noreferrer"
+                            >
                                 <span className="icon">💬</span> Chat on WhatsApp
                             </a>
                             <div className="instagram-link">
-                                Follow us on Instagram: <strong>@waas_photography_</strong>
+                                Follow us on Instagram:
+                                <a
+                                    href="https://instagram.com/waas_photography_"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    <strong>@waas_photography_</strong>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -96,6 +158,7 @@ const Contact = () => {
                                     required
                                 />
                             </div>
+
                             <div className="form-group">
                                 <label>Email Address</label>
                                 <input
@@ -106,6 +169,7 @@ const Contact = () => {
                                     onChange={handleChange}
                                 />
                             </div>
+
                             <div className="form-group">
                                 <label>Inquiry Type</label>
                                 <select
@@ -119,6 +183,7 @@ const Contact = () => {
                                     <option>Other</option>
                                 </select>
                             </div>
+
                             <div className="form-group">
                                 <label>Message</label>
                                 <textarea
@@ -130,12 +195,25 @@ const Contact = () => {
                                     required
                                 />
                             </div>
-                            <button type="submit" className="btn-primary">
-                                Send Message
+
+                            <button
+                                type="submit"
+                                className="btn-primary"
+                                disabled={loading}
+                            >
+                                {loading ? 'Sending...' : 'Send Message'}
                             </button>
                         </form>
+                       
+
                     </div>
                 </div>
+                {/* Success message – fixed so it's always visible */}
+                {success && (
+                    <div className="success-toast" role="alert">
+                        ✅ Thank you! Your message has been sent successfully.
+                    </div>
+                )}
             </div>
         </section>
     );
