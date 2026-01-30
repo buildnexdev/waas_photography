@@ -1,0 +1,79 @@
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 30px 0;
+    z-index: 1000;
+    transition: var(--transition);
+}
+
+.navbar.scrolled {
+    padding: 15px 0;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
+}
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-waas {
+    font-family: var(--font-heading);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--navy-dark);
+    line-height: 1;
+    letter-spacing: -1px;
+}
+
+.logo-sub {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--deep-slate);
+    margin-top: 4px;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.nav-links li a {
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--navy-dark);
+}
+
+.nav-links li a:hover {
+    color: var(--secondary-gold);
+}
+
+.contact-btn {
+    background-color: var(--navy-dark);
+    color: white !important;
+    padding: 10px 25px;
+    border-radius: 50px;
+}
+
+.contact-btn:hover {
+    background-color: var(--primary-gold);
+    color: var(--navy-dark) !important;
+}
+
+@media (max-width: 768px) {
+    .nav-links {
+        display: none;
+        /* Add hamburger menu later */
+    }
+}

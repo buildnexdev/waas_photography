@@ -1,0 +1,43 @@
+.footer {
+  padding: 40px 0;
+  background-color: #121d31;
+  color: white;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-logo .logo-waas {
+  color: white;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.footer-logo .logo-sub {
+  color: var(--primary-gold);
+  font-size: 0.6rem;
+  display: block;
+}
+
+.copyright {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.social-footer a {
+  font-size: 0.85rem;
+  color: var(--primary-gold);
+}
+
+@media (max-width: 768px) {
+  .footer-content {
+    flex-direction: column;
+    gap: 20px;
+    text-align: center;
+  }
+}
