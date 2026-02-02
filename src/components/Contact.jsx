@@ -4,7 +4,7 @@ import './Contact.css';
 // --- Form backend: use Formspree (recommended) or Google Forms ---
 // Formspree: sign up at https://formspree.io, create a form, paste your endpoint below.
 // Submissions go to your email + Formspree dashboard (no 400 issues).
-const FORMSPREE_ENDPOINT = ''; // e.g. 'https://formspree.io/f/xxxxxxxx'
+const FORMSPREE_ENDPOINT = 'https://formspree.io/f/mnjzgzoo';
 
 const GOOGLE_FORM_POST_URL =
     'https://docs.google.com/forms/u/0/d/e/1FAIpQLSeLpQA2_86LM2P8EtwL9zKMERnheGsly4rupsg8ZIR0b6E35A/formResponse';
