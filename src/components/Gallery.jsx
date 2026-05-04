@@ -1,19 +1,17 @@
 import React from 'react';
 import './Gallery.css';
 
-// Importing images (assuming they are in the assets folder)
-import img1 from '../assets/images/gallery-1.png';
-import img2 from '../assets/images/gallery-2.png';
-import img3 from '../assets/images/gallery-3.png';
-import img4 from '../assets/images/gallery-4.png';
+// Dynamically importing all images from the gallery folder
+const imageModules = import.meta.glob('../assets/gallery/*.{jpeg,jpg,png}', { eager: true });
+const galleryImages = Object.values(imageModules).map((mod, index) => ({
+    id: index + 1,
+    src: mod.default,
+    title: `Captured Moment ${index + 1}`,
+    category: 'Portfolio',
+}));
 
 const Gallery = () => {
-    const images = [
-        { id: 1, src: img1, title: 'Wedding', category: 'Events' },
-        { id: 2, src: img2, title: 'Corporate Event', category: 'Events' },
-        { id: 3, src: img3, title: 'Portrait', category: 'People' },
-        { id: 4, src: img4, title: 'Product Shot', category: 'Commercial' },
-    ];
+    const images = galleryImages;
 
     return (
         <section id="portfolio" className="gallery-section">
