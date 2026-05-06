@@ -1,5 +1,31 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './Gallery.css';
+
+/** Limit parallel full-size image downloads so mobile / slow networks don’t stall. */
+const MAX_PARALLEL_IMAGE_DOWNLOADS = 4;
+const imageDownloadGate = {
+    max: MAX_PARALLEL_IMAGE_DOWNLOADS,
+    active: 0,
+    waitQueue: [],
+    acquire() {
+        return new Promise((resolve) => {
+            const grant = () => {
+                this.active += 1;
+                let consumed = false;
+                const release = () => {
+                    if (consumed) return;
+                    consumed = true;
+                    this.active -= 1;
+                    const next = this.waitQueue.shift();
+                    if (next) next();
+                };
+                resolve(release);
+            };
+            if (this.active < this.max) grant();
+            else this.waitQueue.push(grant);
+        });
+    },
+};
 
 /** Matches folders under `src/assets/gallery/<folder>/` */
 const GALLERY_CATEGORY_IDS = ['wedding', 'solo', 'videos', 'feedback'];
@@ -110,38 +136,125 @@ function buildGalleryItems() {
 
 const allGalleryItems = buildGalleryItems();
 
+/**
+ * Loads each asset only when near the viewport (saves bandwidth) and caps how many large
+ * originals download at once (helps mobile networks). Compress exports for best results —
+ * PNG/JPEG from print runs are usually several MB each.
+ */
+function LazyGalleryMedia({ item, alt, fetchPriority, sizes }) {
+    const shellRef = useRef(null);
+    const [mediaUrl, setMediaUrl] = useState(null);
+    const gateReleaseRef = useRef(null);
+
+    useEffect(() => {
+        const el = shellRef.current;
+        if (!el) return undefined;
+
+        let cancelled = false;
+        let observer;
+
+        const kickoff = () => {
+            void (async () => {
+                let releaseImgSlot = () => {};
+                try {
+                    if (item.kind === 'image') {
+                        releaseImgSlot = await imageDownloadGate.acquire();
+                        gateReleaseRef.current = releaseImgSlot;
+                    }
+                    const mod = await item.load();
+                    if (cancelled) {
+                        releaseImgSlot();
+                        gateReleaseRef.current = null;
+                        return;
+                    }
+                    setMediaUrl(mod.default);
+                } catch {
+                    releaseImgSlot();
+                    gateReleaseRef.current = null;
+                }
+            })();
+        };
+
+        if (typeof IntersectionObserver === 'undefined') {
+            kickoff();
+        } else {
+            observer = new IntersectionObserver(
+                (entries) => {
+                    if (!entries.some((e) => e.isIntersecting) || cancelled) return;
+                    observer.disconnect();
+                    kickoff();
+                },
+                { root: null, rootMargin: '300px 0px 560px 0px', threshold: 0.01 }
+            );
+            observer.observe(el);
+        }
+
+        return () => {
+            cancelled = true;
+            observer?.disconnect();
+            gateReleaseRef.current?.();
+            gateReleaseRef.current = null;
+        };
+    }, [item]);
+
+    const onImgFinish = () => {
+        gateReleaseRef.current?.();
+        gateReleaseRef.current = null;
+    };
+
+    if (item.kind === 'video') {
+        return (
+            <div ref={shellRef} className="gallery-tile__surface">
+                {mediaUrl ? (
+                    <video
+                        className="gallery-tile__media"
+                        src={mediaUrl}
+                        controls
+                        muted
+                        playsInline
+                        loop
+                        preload="none"
+                        aria-label={item.title}
+                    />
+                ) : (
+                    <div className="gallery-tile__placeholder" aria-hidden="true" />
+                )}
+            </div>
+        );
+    }
+
+    const priorityAttr = fetchPriority === 'high' ? 'high' : undefined;
+
+    return (
+        <div ref={shellRef} className="gallery-tile__surface">
+            {mediaUrl ? (
+                <img
+                    className="gallery-tile__media"
+                    src={mediaUrl}
+                    alt={alt}
+                    loading={priorityAttr === 'high' ? 'eager' : 'lazy'}
+                    decoding="async"
+                    {...(priorityAttr ? { fetchPriority: priorityAttr } : {})}
+                    sizes={sizes}
+                    onLoad={onImgFinish}
+                    onError={onImgFinish}
+                />
+            ) : (
+                <div className="gallery-tile__placeholder" aria-hidden="true" />
+            )}
+        </div>
+    );
+}
+
+const GALLERY_IMG_SIZES = '(max-width: 600px) 94vw, (max-width: 1024px) 34vw, 25vw';
+
 const Gallery = () => {
     const [activeCategory, setActiveCategory] = useState('wedding');
     const [expandedByCategory, setExpandedByCategory] = useState({});
-    const [loadedMedia, setLoadedMedia] = useState({});
 
     const categoryItems = useMemo(() => {
         return allGalleryItems.filter((item) => item.category === activeCategory);
     }, [activeCategory]);
-
-    useEffect(() => {
-        let cancelled = false;
-        const shouldExpand = Boolean(expandedByCategory[activeCategory]);
-        const targetItems = shouldExpand ? categoryItems : categoryItems.slice(0, PREVIEW_COUNT);
-        const pending = targetItems.filter((item) => !loadedMedia[item.key]);
-
-        if (pending.length === 0) return undefined;
-
-        (async () => {
-            const entries = await Promise.all(
-                pending.map(async (item) => {
-                    const mod = await item.load();
-                    return [item.key, mod.default];
-                })
-            );
-            if (cancelled) return;
-            setLoadedMedia((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [activeCategory, categoryItems, expandedByCategory, loadedMedia]);
 
     const handleCategoryChange = (id) => {
         setActiveCategory(id);
@@ -223,49 +336,44 @@ const Gallery = () => {
                     </div>
                 ) : (
                     <div className="gallery-collage" aria-busy="false">
-                        {collageTiles.map((tile, index) => (
-                            <article
-                                key={tile.key}
-                                className={`gallery-tile ${tile.type === 'message' ? 'gallery-tile--message' : ''}`}
-                                style={{
-                                    '--delay': `${Math.min(index, 14) * 0.04}s`,
-                                }}
-                            >
-                                {tile.type === 'message' ? (
-                                    <div className="gallery-message-tile">
-                                        <span className="gallery-message-tile__label">Waas Moments</span>
-                                        <p className="gallery-message-tile__text">{tile.message}</p>
-                                    </div>
-                                ) : (
-                                    <div className="gallery-tile__surface">
-                                        {loadedMedia[tile.item.key] ? (
-                                            tile.item.kind === 'video' ? (
-                                                <video
-                                                    className="gallery-tile__media"
-                                                    src={loadedMedia[tile.item.key]}
-                                                    controls
-                                                    muted
-                                                    playsInline
-                                                    loop
-                                                    preload="metadata"
-                                                    aria-label={tile.item.title}
-                                                />
-                                            ) : (
-                                                <img
-                                                    className="gallery-tile__media"
-                                                    src={loadedMedia[tile.item.key]}
-                                                    alt={altFromItem(tile.item)}
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                />
-                                            )
+                        {(() => {
+                            let mediaIndex = -1;
+                            return collageTiles.map((tile, index) => {
+                                let fetchPriorityForMedia;
+                                if (tile.type === 'media') {
+                                    mediaIndex += 1;
+                                    fetchPriorityForMedia = mediaIndex < 2 ? 'high' : undefined;
+                                }
+
+                                return (
+                                    <article
+                                        key={tile.key}
+                                        className={`gallery-tile ${
+                                            tile.type === 'message' ? 'gallery-tile--message' : ''
+                                        }`}
+                                        style={{
+                                            '--delay': `${Math.min(index, 14) * 0.04}s`,
+                                        }}
+                                    >
+                                        {tile.type === 'message' ? (
+                                            <div className="gallery-message-tile">
+                                                <span className="gallery-message-tile__label">
+                                                    Waas Moments
+                                                </span>
+                                                <p className="gallery-message-tile__text">{tile.message}</p>
+                                            </div>
                                         ) : (
-                                            <div className="gallery-tile__placeholder" aria-hidden="true" />
+                                            <LazyGalleryMedia
+                                                item={tile.item}
+                                                alt={altFromItem(tile.item)}
+                                                fetchPriority={fetchPriorityForMedia}
+                                                sizes={GALLERY_IMG_SIZES}
+                                            />
                                         )}
-                                    </div>
-                                )}
-                            </article>
-                        ))}
+                                    </article>
+                                );
+                            });
+                        })()}
                     </div>
                 )}
                 {!expanded && hasMore && (
